@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Alerta Rutas</string>
+    <string name="subtitulo">Avisa fuerte cuando Envios Extra ofrece una ruta y guarda el registro de las ofertas.</string>
+    <string name="dar_acceso">Dar acceso a notificaciones</string>
+    <string name="alerta_activada">Alerta activada</string>
+    <string name="probar">Probar alarma</string>
+    <string name="detener">Detener</string>
+    <string name="sin_limite">Sonar hasta que la apague</string>
+    <string name="sin_limite_ayuda">Con esto la alarma no se corta sola. Se apaga con el boton Silenciar del aviso o con Detener. Igual se corta a los 5 minutos para no gastar la bateria.</string>
+    <string name="respaldar">Respaldar en Descargas</string>
+    <string name="alerta_encabezado">OFERTA DE RUTA</string>
+    <string name="alerta_abrir">Abrir Envios Extra</string>
+    <string name="alerta_silenciar">Silenciar</string>
+    <string name="alerta_pie">Abre la app para que tu aceptes la ruta. Alerta Rutas no acepta nada por ti.</string>
+    <string name="permiso_pantalla_completa">Permitir aviso en pantalla completa</string>
+    <string name="horario_titulo">Horario de trabajo</string>
+    <string name="horario_activado">Sonar solo en mi horario</string>
+    <string name="horario_ayuda">Fuera del horario la oferta queda anotada igual, pero sin alarma.</string>
+    <string name="dias_titulo">Dias en que trabajas</string>
+    <string name="registro_titulo">Ofertas recibidas</string>
+    <string name="compartir">Compartir registro</string>
+    <string name="borrar">Borrar registro</string>
+    <string name="nota_legal">Esta app solo avisa, abre Envios Extra y anota. No acepta rutas por ti: aceptar siempre lo haces tu, a mano.</string>
+    <string name="dia_lun">L</string>
+    <string name="dia_mar">M</string>
+    <string name="dia_mie">M</string>
+    <string name="dia_jue">J</string>
+    <string name="dia_vie">V</string>
+    <string name="dia_sab">S</string>
+    <string name="dia_dom">D</string>
+</resources>
