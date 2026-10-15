@@ -21,10 +21,18 @@ object Aviso {
     const val ID_AVISO = 2001
     const val EXTRA_TITULO = "titulo"
     const val EXTRA_TEXTO = "texto"
+    const val EXTRA_MOMENTO = "momento"
+    const val EXTRA_DETALLE = "detalle"
 
     private const val CANAL = "ofertas_ruta"
 
-    fun mostrar(ctx: Context, titulo: String, texto: String) {
+    fun mostrar(
+        ctx: Context,
+        titulo: String,
+        texto: String,
+        recibida: Long = 0L,
+        extra: String = ""
+    ) {
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
         crearCanal(nm)
@@ -44,12 +52,21 @@ object Aviso {
         pantallaCompleta.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         pantallaCompleta.putExtra(EXTRA_TITULO, titulo)
         pantallaCompleta.putExtra(EXTRA_TEXTO, texto)
+        pantallaCompleta.putExtra(EXTRA_MOMENTO, recibida)
+        pantallaCompleta.putExtra(EXTRA_DETALLE, extra)
         val piPantallaCompleta = PendingIntent.getActivity(
             ctx, 3, pantallaCompleta, banderas()
         )
 
         val icono = Icon.createWithResource(ctx, R.drawable.ic_app)
-        val cuerpo = if (texto.isBlank()) "Toca para abrir Envios Extra" else texto
+        val horario = Filtro.horarioDelTexto(titulo, texto, extra)
+        val base = when {
+            texto.isNotBlank() && extra.isNotBlank() -> "$texto\n$extra"
+            texto.isNotBlank() -> texto
+            extra.isNotBlank() -> extra
+            else -> "Toca para abrir Envios Extra"
+        }
+        val cuerpo = if (horario != null) "Recorrido: $horario\n$base" else base
 
         val constructor = Notification.Builder(ctx, CANAL)
             .setSmallIcon(R.drawable.ic_app)

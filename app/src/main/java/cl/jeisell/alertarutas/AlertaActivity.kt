@@ -5,9 +5,13 @@ import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Pantalla de aviso a pantalla completa, estilo llamada entrante.
@@ -20,6 +24,10 @@ class AlertaActivity : Activity() {
 
     private lateinit var tvTitulo: TextView
     private lateinit var tvTexto: TextView
+    private lateinit var tvMomento: TextView
+    private lateinit var tvHorario: TextView
+
+    private val formatoMomento = SimpleDateFormat("EEEE d 'de' MMMM · HH:mm", Locale("es", "CL"))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +41,8 @@ class AlertaActivity : Activity() {
 
         tvTitulo = findViewById(R.id.tvAlertaTitulo)
         tvTexto = findViewById(R.id.tvAlertaTexto)
+        tvMomento = findViewById(R.id.tvAlertaMomento)
+        tvHorario = findViewById(R.id.tvAlertaHorario)
 
         findViewById<Button>(R.id.btnAlertaAbrir).setOnClickListener { abrirConDesbloqueo() }
         findViewById<Button>(R.id.btnAlertaSilenciar).setOnClickListener { silenciar() }
@@ -50,9 +60,33 @@ class AlertaActivity : Activity() {
     private fun pintar(intent: Intent?) {
         val titulo = intent?.getStringExtra(Aviso.EXTRA_TITULO).orEmpty()
         val texto = intent?.getStringExtra(Aviso.EXTRA_TEXTO).orEmpty()
+        val detalle = intent?.getStringExtra(Aviso.EXTRA_DETALLE).orEmpty()
         tvTitulo.text = if (titulo.isBlank()) "Oferta de ruta" else titulo
-        tvTexto.text = if (texto.isBlank()) "Toca para abrir Envios Extra" else texto
+        tvTexto.text = when {
+            texto.isNotBlank() && detalle.isNotBlank() -> "$texto\n$detalle"
+            texto.isNotBlank() -> texto
+            detalle.isNotBlank() -> detalle
+            else -> "Toca para abrir Envios Extra"
+        }
+
+        // cuando llego el aviso: dia de la semana y hora, en grande
+        val momento = intent?.getLongExtra(Aviso.EXTRA_MOMENTO, 0L) ?: 0L
+        val cuando = if (momento > 0L) Date(momento) else Date()
+        tvMomento.text = conMayuscula(formatoMomento.format(cuando))
+
+        // horario del recorrido, solo si Envios Extra lo escribio en el texto
+        val horario = Filtro.horarioDelTexto(titulo, texto, detalle)
+        if (horario == null) {
+            tvHorario.visibility = View.GONE
+        } else {
+            tvHorario.visibility = View.VISIBLE
+            tvHorario.text = "Recorrido: $horario"
+        }
     }
+
+    private fun conMayuscula(texto: String): String =
+        if (texto.isEmpty()) texto
+        else texto.substring(0, 1).uppercase(Locale("es", "CL")) + texto.substring(1)
 
     /**
      * Si el telefono tiene clave, Android no deja saltar a otra app sin

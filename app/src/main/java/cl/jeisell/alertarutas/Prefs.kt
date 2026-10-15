@@ -5,12 +5,26 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
 
-/** Oferta de ruta detectada en una notificacion de Envios Extra. */
+/**
+ * Oferta de ruta detectada en una notificacion de Envios Extra.
+ *
+ * [recibida] es la hora en que Envios Extra publico la notificacion y
+ * [momento] cuando esta app la proceso: la resta de las dos es la demora
+ * real de la app, el dato que sirve para saber si esta llegando tarde.
+ */
 data class Oferta(
     val momento: Long,
     val titulo: String,
-    val texto: String
-)
+    val texto: String,
+    val recibida: Long = 0L,
+    val estado: String = "",
+    /** Texto adicional que trae la notificacion y no se ve en la barra. */
+    val extra: String = ""
+) {
+    /** Milisegundos que tardo la app en reaccionar. -1 si no se pudo medir. */
+    val demoraMs: Long
+        get() = if (recibida <= 0L || momento < recibida) -1L else momento - recibida
+}
 
 /**
  * Guarda la configuracion y el registro de ofertas en SharedPreferences.
@@ -20,11 +34,20 @@ object Prefs {
 
     const val PAQUETE_ENVIOS_EXTRA = "com.mercadoenvios.crowdsourcing"
 
+    /** Motivos posibles de cada oferta anotada. */
+    const val ESTADO_SONO = "sono"
+    const val ESTADO_FUERA_HORARIO = "fuera_horario"
+    const val ESTADO_ALERTA_APAGADA = "alerta_apagada"
+    const val ESTADO_NO_ES_OFERTA = "no_es_oferta"
+
     private const val ARCHIVO = "alerta_rutas"
     private const val KEY_ACTIVA = "alerta_activa"
     private const val KEY_SEGUNDOS = "segundos_alarma"
     private const val KEY_SIN_LIMITE = "sin_limite"
     private const val KEY_ULTIMO_RESPALDO = "ultimo_respaldo"
+    private const val KEY_SOLO_OFERTAS = "solo_ofertas"
+    private const val KEY_PALABRAS_OFERTA = "palabras_oferta"
+    private const val KEY_PALABRAS_IGNORAR = "palabras_ignorar"
     private const val KEY_LOG = "registro"
     private const val KEY_HORARIO = "horario_activo"
     private const val KEY_DIAS = "dias"
@@ -82,6 +105,51 @@ object Prefs {
 
     fun setUltimoRespaldo(ctx: Context, fecha: String) {
         sp(ctx).edit().putString(KEY_ULTIMO_RESPALDO, fecha).apply()
+    }
+
+    // ---------------------------------------------------------------- filtro
+
+    /** Si esta activo, la alarma suena solo cuando el aviso parece oferta. */
+    fun soloOfertas(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_SOLO_OFERTAS, true)
+
+    fun setSoloOfertas(ctx: Context, valor: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_SOLO_OFERTAS, valor).apply()
+    }
+
+    fun palabrasOferta(ctx: Context): List<String> =
+        listaGuardada(ctx, KEY_PALABRAS_OFERTA) ?: Filtro.PALABRAS_OFERTA
+
+    fun setPalabrasOferta(ctx: Context, texto: String) {
+        sp(ctx).edit().putString(KEY_PALABRAS_OFERTA, texto).apply()
+    }
+
+    fun palabrasIgnorar(ctx: Context): List<String> =
+        listaGuardada(ctx, KEY_PALABRAS_IGNORAR) ?: Filtro.PALABRAS_IGNORAR
+
+    fun setPalabrasIgnorar(ctx: Context, texto: String) {
+        sp(ctx).edit().putString(KEY_PALABRAS_IGNORAR, texto).apply()
+    }
+
+    /** Texto editable que se muestra en la pantalla de ajustes. */
+    fun textoPalabrasOferta(ctx: Context): String =
+        sp(ctx).getString(KEY_PALABRAS_OFERTA, null) ?: Filtro.PALABRAS_OFERTA.joinToString(", ")
+
+    fun textoPalabrasIgnorar(ctx: Context): String =
+        sp(ctx).getString(KEY_PALABRAS_IGNORAR, null) ?: Filtro.PALABRAS_IGNORAR.joinToString(", ")
+
+    fun restaurarPalabras(ctx: Context) {
+        sp(ctx).edit()
+            .remove(KEY_PALABRAS_OFERTA)
+            .remove(KEY_PALABRAS_IGNORAR)
+            .apply()
+    }
+
+    private fun listaGuardada(ctx: Context, clave: String): List<String>? {
+        val crudo = sp(ctx).getString(clave, null) ?: return null
+        val lista = crudo.split(",", "\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        return if (lista.isEmpty()) emptyList() else lista
     }
 
     // --------------------------------------------------------------- horario
@@ -151,18 +219,35 @@ object Prefs {
         }
     }
 
+    /**
+     * Configuracion peligrosa: el horario esta activo pero no hay ningun dia
+     * marcado, asi que la alarma no va a sonar nunca.
+     */
+    fun horarioSinDias(ctx: Context): Boolean =
+        horarioActivo(ctx) && dias(ctx).isEmpty()
+
     private fun diaAnterior(dia: Int): Int =
         if (dia == Calendar.SUNDAY) Calendar.SATURDAY else dia - 1
 
     // --------------------------------------------------------------- registro
 
-    fun registrar(ctx: Context, titulo: String, texto: String) {
+    fun registrar(
+        ctx: Context,
+        titulo: String,
+        texto: String,
+        recibida: Long = 0L,
+        estado: String = "",
+        extra: String = ""
+    ) {
         val anteriores = registro(ctx)
         val nuevo = JSONArray()
         val actual = JSONObject()
         actual.put("t", System.currentTimeMillis())
         actual.put("titulo", titulo)
         actual.put("texto", texto)
+        actual.put("r", recibida)
+        actual.put("e", estado)
+        actual.put("x", extra)
         nuevo.put(actual)
         for (oferta in anteriores) {
             if (nuevo.length() >= MAX_REGISTROS) break
@@ -170,6 +255,9 @@ object Prefs {
             o.put("t", oferta.momento)
             o.put("titulo", oferta.titulo)
             o.put("texto", oferta.texto)
+            o.put("r", oferta.recibida)
+            o.put("e", oferta.estado)
+            o.put("x", oferta.extra)
             nuevo.put(o)
         }
         sp(ctx).edit().putString(KEY_LOG, nuevo.toString()).apply()
@@ -187,7 +275,10 @@ object Prefs {
                     Oferta(
                         momento = o.optLong("t", 0L),
                         titulo = o.optString("titulo", ""),
-                        texto = o.optString("texto", "")
+                        texto = o.optString("texto", ""),
+                        recibida = o.optLong("r", 0L),
+                        estado = o.optString("e", ""),
+                        extra = o.optString("x", "")
                     )
                 )
             }

@@ -33,15 +33,26 @@ object Respaldo {
      * Excel en Chile.
      */
     fun armarCsv(ofertas: List<Oferta>): String {
-        val sb = StringBuilder("Fecha;Hora;Titulo;Texto\r\n")
+        val sb = StringBuilder("Fecha;Hora;Reaccion ms;Alarma;Titulo;Texto;Texto adicional\r\n")
         for (o in ofertas) {
             val momento = Date(o.momento)
             sb.append(campo(FECHA_FILA.format(momento))).append(';')
             sb.append(campo(HORA_FILA.format(momento))).append(';')
+            sb.append(campo(if (o.demoraMs < 0) "" else o.demoraMs.toString())).append(';')
+            sb.append(campo(descripcionEstado(o.estado))).append(';')
             sb.append(campo(o.titulo)).append(';')
-            sb.append(campo(o.texto)).append("\r\n")
+            sb.append(campo(o.texto)).append(';')
+            sb.append(campo(o.extra)).append("\r\n")
         }
         return sb.toString()
+    }
+
+    private fun descripcionEstado(estado: String): String = when (estado) {
+        Prefs.ESTADO_SONO -> "sono"
+        Prefs.ESTADO_FUERA_HORARIO -> "sin alarma: fuera de horario"
+        Prefs.ESTADO_ALERTA_APAGADA -> "sin alarma: alerta apagada"
+        Prefs.ESTADO_NO_ES_OFERTA -> "sin alarma: no es oferta"
+        else -> ""
     }
 
     /**

@@ -10,6 +10,17 @@ llegaron.
 - Cuando llega una, sube el volumen de alarma al máximo, suena la alarma del
   teléfono en bucle y vibra. Suena aunque el teléfono esté en silencio, porque
   usa el canal de *alarma*.
+- **Suena solo con ofertas de ruta.** Envíos Extra manda muchos avisos que no
+  son ofertas (que llegaste al domicilio, los del desafío, el de la ubicación en
+  segundo plano, las ganancias acreditadas). Esos quedan anotados en el registro
+  pero no hacen sonar la alarma. Las frases del filtro se editan desde la app.
+- **Muestra el día y la hora**: el aviso a pantalla completa dice en grande
+  cuándo llegó la oferta, y si Envíos Extra incluye el día u horario del
+  recorrido en el texto, lo rescata y lo muestra destacado. Reconoce "mañana",
+  "pasado mañana", días de la semana con número, fechas y rangos de hora.
+- **Lee todo el texto de la notificación**, no solo lo que se ve en la barra:
+  texto expandido, subtítulo, resumen y líneas de lista. Si Envíos Extra manda
+  el día del recorrido en alguno de esos campos, la app lo encuentra.
 - Muestra un aviso **a pantalla completa, estilo llamada entrante**: la pantalla
   se enciende sola, aparece la oferta en grande y un botón **Abrir Envíos
   Extra** que lleva directo a la app, más **Silenciar**. Funciona sobre la

@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.widget.Button
+import android.widget.EditText
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
@@ -30,6 +31,9 @@ class MainActivity : Activity() {
     private lateinit var swAlerta: Switch
     private lateinit var swHorario: Switch
     private lateinit var swSinLimite: Switch
+    private lateinit var swSoloOfertas: Switch
+    private lateinit var etPalabrasOferta: EditText
+    private lateinit var etPalabrasIgnorar: EditText
     private lateinit var sbSegundos: SeekBar
     private lateinit var btnDesde: Button
     private lateinit var btnHasta: Button
@@ -56,6 +60,9 @@ class MainActivity : Activity() {
         swAlerta = findViewById(R.id.swAlerta)
         swHorario = findViewById(R.id.swHorario)
         swSinLimite = findViewById(R.id.swSinLimite)
+        swSoloOfertas = findViewById(R.id.swSoloOfertas)
+        etPalabrasOferta = findViewById(R.id.etPalabrasOferta)
+        etPalabrasIgnorar = findViewById(R.id.etPalabrasIgnorar)
         sbSegundos = findViewById(R.id.sbSegundos)
         btnDesde = findViewById(R.id.btnDesde)
         btnHasta = findViewById(R.id.btnHasta)
@@ -72,6 +79,7 @@ class MainActivity : Activity() {
 
         pedirPermisoDeAvisos()
         configurarAlarma()
+        configurarFiltro()
         configurarHorario()
 
         findViewById<Button>(R.id.btnPermiso).setOnClickListener { abrirAjustesDeAcceso() }
@@ -136,6 +144,30 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnDetener).setOnClickListener {
             Alarma.detener()
             Aviso.quitar(this)
+        }
+    }
+
+    private fun configurarFiltro() {
+        swSoloOfertas.isChecked = Prefs.soloOfertas(this)
+        swSoloOfertas.setOnCheckedChangeListener { _, marcado ->
+            Prefs.setSoloOfertas(this, marcado)
+            pintarEstado()
+        }
+
+        etPalabrasOferta.setText(Prefs.textoPalabrasOferta(this))
+        etPalabrasIgnorar.setText(Prefs.textoPalabrasIgnorar(this))
+
+        findViewById<Button>(R.id.btnGuardarFiltros).setOnClickListener {
+            Prefs.setPalabrasOferta(this, etPalabrasOferta.text.toString())
+            Prefs.setPalabrasIgnorar(this, etPalabrasIgnorar.text.toString())
+            Toast.makeText(this, "Frases guardadas", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<Button>(R.id.btnRestaurarFiltros).setOnClickListener {
+            Prefs.restaurarPalabras(this)
+            etPalabrasOferta.setText(Prefs.textoPalabrasOferta(this))
+            etPalabrasIgnorar.setText(Prefs.textoPalabrasIgnorar(this))
+            Toast.makeText(this, "Frases restauradas", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -228,8 +260,10 @@ class MainActivity : Activity() {
                 "Permiso listo, pero no encuentro la app Envios Extra en este telefono."
             !Prefs.alertaActiva(this) ->
                 "Alerta apagada. Enciende el switch para volver a escuchar."
+            Prefs.horarioSinDias(this) ->
+                "OJO: tienes el horario activado sin ningun dia marcado, asi que la alarma NO va a sonar nunca. Marca tus dias o apaga el horario."
             !Aviso.puedeUsarPantallaCompleta(this) ->
-                "Escuchando. Falta permitir el aviso en pantalla completa para que la oferta aparezca sola."
+                "OJO: falta permitir el aviso en pantalla completa. La oferta llega, pero no aparece sola en la pantalla."
             !Prefs.enHorario(this) ->
                 "Escuchando, pero fuera de tu horario: las ofertas se anotan sin alarma."
             else ->
@@ -246,15 +280,47 @@ class MainActivity : Activity() {
         val sb = StringBuilder()
         for (o in ofertas) {
             sb.append(formato.format(Date(o.momento)))
-            sb.append("  ")
+            val demora = etiquetaDemora(o)
+            if (demora.isNotEmpty()) {
+                sb.append("  ")
+                sb.append(demora)
+            }
+            val motivo = etiquetaEstado(o)
+            if (motivo.isNotEmpty()) {
+                sb.append("  ")
+                sb.append(motivo)
+            }
+            sb.append("\n")
             if (o.titulo.isNotBlank()) {
                 sb.append(o.titulo)
                 if (o.texto.isNotBlank()) sb.append(" - ")
             }
             sb.append(o.texto)
-            sb.append("\n")
+            if (o.extra.isNotBlank()) {
+                sb.append("\n+ ")
+                sb.append(o.extra)
+            }
+            sb.append("\n\n")
         }
         tvRegistro.text = sb.toString().trimEnd()
+    }
+
+    /** Cuanto tardo la app en reaccionar despues de que llego la notificacion. */
+    private fun etiquetaDemora(o: Oferta): String {
+        val ms = o.demoraMs
+        if (ms < 0) return ""
+        return if (ms < 1000) {
+            "(reaccion: ${ms} ms)"
+        } else {
+            "(reaccion: ${String.format(Locale.US, "%.1f", ms / 1000.0)} s)"
+        }
+    }
+
+    private fun etiquetaEstado(o: Oferta): String = when (o.estado) {
+        Prefs.ESTADO_FUERA_HORARIO -> "SIN ALARMA: fuera de tu horario"
+        Prefs.ESTADO_ALERTA_APAGADA -> "SIN ALARMA: alerta apagada"
+        Prefs.ESTADO_NO_ES_OFERTA -> "SIN ALARMA: no es oferta"
+        else -> ""
     }
 
     // --------------------------------------------------------------- acciones
@@ -272,6 +338,10 @@ class MainActivity : Activity() {
             sb.append(o.titulo)
             sb.append("\t")
             sb.append(o.texto)
+            if (o.extra.isNotBlank()) {
+                sb.append("\t")
+                sb.append(o.extra)
+            }
             sb.append("\n")
         }
         val intent = Intent(Intent.ACTION_SEND)
