@@ -14,6 +14,7 @@
     <string name="alerta_silenciar">Silenciar</string>
     <string name="alerta_pie">Abre la app para que tu aceptes la ruta. Alerta Rutas no acepta nada por ti.</string>
     <string name="permiso_pantalla_completa">Permitir aviso en pantalla completa</string>
+    <string name="permiso_bateria">Quitar restricción de batería</string>
     <string name="filtro_titulo">Que avisos hacen sonar la alarma</string>
     <string name="solo_ofertas">Sonar solo con ofertas de ruta</string>
     <string name="solo_ofertas_ayuda">Envíos Extra manda muchos avisos que no son ofertas: que llegaste al domicilio, los del desafío, el de la ubicación. Con esto activado, esos quedan anotados pero no suenan.</string>

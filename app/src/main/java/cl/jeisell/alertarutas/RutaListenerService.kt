@@ -79,23 +79,57 @@ class RutaListenerService : NotificationListenerService() {
             else -> Prefs.ESTADO_SONO
         }
 
-        // el registro se guarda siempre, incluso si no corresponde sonar:
-        // asi se puede revisar despues que avisos quedaron filtrados
-        Prefs.registrar(ctx, titulo, texto, recibida, estado, extra)
+        // PRIMERO LA ALERTA, DESPUES ANOTAR.
+        // Guardar el registro obliga a leer y reescribir todo el historial, y
+        // eso son milisegundos que antes se gastaban ANTES de que sonara la
+        // alarma. Ahora la persona se entera primero y el papeleo va despues,
+        // ademas en un hilo aparte para que nunca estorbe.
+        val ahora = System.currentTimeMillis()
 
-        if (!activa) return
-        if (!esOferta) return
-
-        // el aviso con el boton de abrir aparece siempre; la alarma, solo en horario
-        Aviso.mostrar(ctx, titulo, texto, recibida, extra)
-
-        if (enHorario) {
-            Alarma.sonar(ctx, Prefs.duracionAlarma(ctx))
+        if (activa && esOferta) {
+            // el aviso con el boton de abrir aparece siempre; la alarma, solo en horario
+            Aviso.mostrar(ctx, titulo, texto, recibida, extra)
+            if (enHorario) {
+                Alarma.sonar(ctx, Prefs.duracionAlarma(ctx))
+            }
         }
+
+        // el registro se guarda siempre, incluso cuando no corresponde sonar:
+        // asi se puede revisar despues que avisos quedaron filtrados
+        anotarEnSegundoPlano(ctx, titulo, texto, recibida, estado, extra, ahora)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         // no se usa
+    }
+
+    /**
+     * Anota la oferta fuera del camino critico.
+     *
+     * Se usa un solo hilo en fila para que las anotaciones no se pisen entre
+     * ellas cuando llegan dos avisos casi juntos.
+     */
+    private fun anotarEnSegundoPlano(
+        ctx: android.content.Context,
+        titulo: String,
+        texto: String,
+        recibida: Long,
+        estado: String,
+        extra: String,
+        momento: Long
+    ) {
+        try {
+            escribano.execute {
+                try {
+                    Prefs.registrar(ctx, titulo, texto, recibida, estado, extra, momento)
+                } catch (e: Exception) {
+                    // si falla la anotacion, la alerta ya se dio igual
+                }
+            }
+        } catch (e: Exception) {
+            // si no se puede encolar, anotar aqui mismo antes que perder el dato
+            Prefs.registrar(ctx, titulo, texto, recibida, estado, extra, momento)
+        }
     }
 
     /**
@@ -143,5 +177,9 @@ class RutaListenerService : NotificationListenerService() {
 
     private companion object {
         const val MAX_ATENDIDAS = 60
+
+        /** Hilo unico donde se escriben las anotaciones, fuera del camino critico. */
+        val escribano: java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newSingleThreadExecutor()
     }
 }

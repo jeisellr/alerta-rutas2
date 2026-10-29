@@ -11,8 +11,8 @@ android {
         applicationId = "cl.jeisell.alertarutas"
         minSdk = 29
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 7
+        versionName = "1.6"
     }
 
     // Firma propia y fija. Sin esto, cada compilacion en GitHub usaria una

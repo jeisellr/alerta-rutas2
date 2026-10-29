@@ -3,6 +3,7 @@ package cl.jeisell.alertarutas
 import android.Manifest
 import android.app.Activity
 import android.app.TimePickerDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
@@ -86,6 +88,12 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnPantallaCompleta).setOnClickListener {
             abrirAjustesDePantallaCompleta()
         }
+        findViewById<Button>(R.id.btnBateria).setOnClickListener { pedirBateriaLibre() }
+
+        // que el servicio se reenganche si Android lo solto, y dejar la
+        // revision periodica programada
+        Vigilante.reenganchar(this)
+        Vigilante.programarRevision(this)
         findViewById<Button>(R.id.btnCompartir).setOnClickListener { compartirRegistro() }
         findViewById<Button>(R.id.btnBorrar).setOnClickListener {
             Prefs.borrarRegistro(this)
@@ -262,6 +270,8 @@ class MainActivity : Activity() {
                 "Alerta apagada. Enciende el switch para volver a escuchar."
             Prefs.horarioSinDias(this) ->
                 "OJO: tienes el horario activado sin ningun dia marcado, asi que la alarma NO va a sonar nunca. Marca tus dias o apaga el horario."
+            !bateriaLibre() ->
+                "OJO: Android puede dormir la app. Toca \"Quitar restriccion de bateria\" y acepta."
             !Aviso.puedeUsarPantallaCompleta(this) ->
                 "OJO: falta permitir el aviso en pantalla completa. La oferta llega, pero no aparece sola en la pantalla."
             !Prefs.enHorario(this) ->
@@ -364,6 +374,39 @@ class MainActivity : Activity() {
         }
         Prefs.setUltimoRespaldo(this, Respaldo.hoy())
         Toast.makeText(this, "Guardado en Descargas: $nombre", Toast.LENGTH_LONG).show()
+    }
+
+    /** True si Android ya dejo a la app fuera del ahorro de bateria. */
+    private fun bateriaLibre(): Boolean {
+        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+        return try {
+            pm.isIgnoringBatteryOptimizations(packageName)
+        } catch (e: Exception) {
+            true
+        }
+    }
+
+    private fun pedirBateriaLibre() {
+        if (bateriaLibre()) {
+            Toast.makeText(this, "La bateria ya esta sin restricciones", Toast.LENGTH_SHORT)
+                .show()
+            return
+        }
+        try {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            intent.data = Uri.parse("package:$packageName")
+            startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (e2: Exception) {
+                Toast.makeText(
+                    this,
+                    "Abre Ajustes > Aplicaciones > Alerta Rutas > Bateria > Sin restricciones",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     private fun abrirAjustesDePantallaCompleta() {

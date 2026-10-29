@@ -8,6 +8,7 @@ import android.media.RingtoneManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -26,11 +27,15 @@ object Alarma {
      */
     private const val TOPE_SIN_LIMITE_MS = 5 * 60 * 1000L
 
+    /** Cuanto puede quedar la pantalla encendida por la alarma, como maximo. */
+    private const val TOPE_PANTALLA_MS = 30 * 1000L
+
     private val handler = Handler(Looper.getMainLooper())
 
     private var player: MediaPlayer? = null
     private var volumenPrevio = -1
     private var contexto: Context? = null
+    private var pantalla: PowerManager.WakeLock? = null
 
     private val detenerSolo = Runnable { detener() }
 
@@ -45,6 +50,7 @@ object Alarma {
         detenerReproduccion()
         handler.removeCallbacks(detenerSolo)
 
+        encenderPantalla(ctx)
         subirVolumenAlarma(ctx)
         reproducir(ctx)
         vibrar(ctx)
@@ -56,6 +62,7 @@ object Alarma {
     fun detener() {
         handler.removeCallbacks(detenerSolo)
         detenerReproduccion()
+        soltarPantalla()
         val ctx = contexto ?: return
         vibrador(ctx)?.cancel()
         restaurarVolumen(ctx)
@@ -102,6 +109,43 @@ object Alarma {
         }
         try {
             mp.release()
+        } catch (e: Exception) {
+            // nada
+        }
+    }
+
+    /**
+     * Segunda via para que la pantalla se encienda.
+     *
+     * El aviso a pantalla completa deberia bastar, pero hay fabricantes que lo
+     * ignoran cuando el telefono esta durmiendo. Este candado la enciende por
+     * la fuerza, siempre con tope de tiempo para no quemar bateria si la
+     * persona no esta cerca.
+     */
+    private fun encenderPantalla(ctx: Context) {
+        soltarPantalla()
+        val pm = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
+        try {
+            @Suppress("DEPRECATION")
+            val candado = pm.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                    PowerManager.ON_AFTER_RELEASE,
+                "AlertaRutas:pantalla"
+            )
+            candado.setReferenceCounted(false)
+            candado.acquire(TOPE_PANTALLA_MS)
+            pantalla = candado
+        } catch (e: Exception) {
+            pantalla = null
+        }
+    }
+
+    private fun soltarPantalla() {
+        val candado = pantalla ?: return
+        pantalla = null
+        try {
+            if (candado.isHeld) candado.release()
         } catch (e: Exception) {
             // nada
         }

@@ -46,6 +46,13 @@
             android:layout_marginTop="8dp"
             android:text="@string/permiso_pantalla_completa" />
 
+        <Button
+            android:id="@+id/btnBateria"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/permiso_bateria" />
+
         <Switch
             android:id="@+id/swAlerta"
             android:layout_width="match_parent"

@@ -237,12 +237,17 @@ object Prefs {
         texto: String,
         recibida: Long = 0L,
         estado: String = "",
-        extra: String = ""
+        extra: String = "",
+        /**
+         * Momento en que la app atendio el aviso. Se recibe de afuera para que
+         * la medicion de reaccion no incluya lo que tarda este guardado.
+         */
+        momento: Long = System.currentTimeMillis()
     ) {
         val anteriores = registro(ctx)
         val nuevo = JSONArray()
         val actual = JSONObject()
-        actual.put("t", System.currentTimeMillis())
+        actual.put("t", momento)
         actual.put("titulo", titulo)
         actual.put("texto", texto)
         actual.put("r", recibida)
