@@ -6,8 +6,10 @@
     <string name="alerta_activada">Alerta activada</string>
     <string name="probar">Probar alarma</string>
     <string name="detener">Detener</string>
-    <string name="sin_limite">Sonar hasta que la apague</string>
-    <string name="sin_limite_ayuda">Con esto la alarma no se corta sola. Se apaga con el boton Silenciar del aviso o con Detener. Igual se corta a los 5 minutos para no gastar la bateria.</string>
+    <string name="voz">Decir la oferta en voz alta</string>
+    <string name="voz_ayuda">Además de la alarma, el teléfono dice en voz alta que llegó una oferta, cuántas van hoy y el horario si viene en el texto. Mientras habla baja la alarma para que se entienda.</string>
+    <string name="sin_limite">Sonar mientras la oferta siga disponible</string>
+    <string name="sin_limite_ayuda">La alarma insiste mientras la oferta siga en la bandeja y se calla sola apenas Mercado Libre la retira, que es cuando ya no sirve correr. Tambien se apaga con Silenciar o Detener, y tiene tope de 5 minutos por si acaso.</string>
     <string name="respaldar">Respaldar en Descargas</string>
     <string name="alerta_encabezado">OFERTA DE RUTA</string>
     <string name="alerta_abrir">Abrir Envios Extra</string>

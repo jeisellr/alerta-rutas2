@@ -19,7 +19,13 @@ data class Oferta(
     val recibida: Long = 0L,
     val estado: String = "",
     /** Texto adicional que trae la notificacion y no se ve en la barra. */
-    val extra: String = ""
+    val extra: String = "",
+    /** Identificador de la notificacion, para poder cerrarla despues. */
+    val clave: String = "",
+    /** Cuanto estuvo viva la oferta en la bandeja. -1 si todavia no se sabe. */
+    val duroMs: Long = -1L,
+    /** Por que desaparecio: la retiro Mercado Libre, la abriste, etc. */
+    val fin: String = ""
 ) {
     /** Milisegundos que tardo la app en reaccionar. -1 si no se pudo medir. */
     val demoraMs: Long
@@ -48,6 +54,10 @@ object Prefs {
     private const val KEY_SOLO_OFERTAS = "solo_ofertas"
     private const val KEY_PALABRAS_OFERTA = "palabras_oferta"
     private const val KEY_PALABRAS_IGNORAR = "palabras_ignorar"
+    private const val KEY_CONTADOR = "contador_ofertas"
+    private const val KEY_CONTADOR_FECHA = "contador_fecha"
+    private const val KEY_ULTIMA_OFERTA = "ultima_oferta"
+    private const val KEY_VOZ = "voz_activa"
     private const val KEY_LOG = "registro"
     private const val KEY_HORARIO = "horario_activo"
     private const val KEY_DIAS = "dias"
@@ -81,6 +91,13 @@ object Prefs {
 
     fun setSegundosAlarma(ctx: Context, valor: Int) {
         sp(ctx).edit().putInt(KEY_SEGUNDOS, valor).apply()
+    }
+
+    /** True si ademas de la alarma hay que decir la oferta en voz alta. */
+    fun vozActiva(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_VOZ, false)
+
+    fun setVozActiva(ctx: Context, valor: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_VOZ, valor).apply()
     }
 
     /** True si la alarma debe sonar hasta que la persona la silencie. */
@@ -242,7 +259,8 @@ object Prefs {
          * Momento en que la app atendio el aviso. Se recibe de afuera para que
          * la medicion de reaccion no incluya lo que tarda este guardado.
          */
-        momento: Long = System.currentTimeMillis()
+        momento: Long = System.currentTimeMillis(),
+        clave: String = ""
     ) {
         val anteriores = registro(ctx)
         val nuevo = JSONArray()
@@ -253,17 +271,13 @@ object Prefs {
         actual.put("r", recibida)
         actual.put("e", estado)
         actual.put("x", extra)
+        actual.put("k", clave)
+        actual.put("d", -1L)
+        actual.put("f", "")
         nuevo.put(actual)
         for (oferta in anteriores) {
             if (nuevo.length() >= MAX_REGISTROS) break
-            val o = JSONObject()
-            o.put("t", oferta.momento)
-            o.put("titulo", oferta.titulo)
-            o.put("texto", oferta.texto)
-            o.put("r", oferta.recibida)
-            o.put("e", oferta.estado)
-            o.put("x", oferta.extra)
-            nuevo.put(o)
+            nuevo.put(aJson(oferta))
         }
         sp(ctx).edit().putString(KEY_LOG, nuevo.toString()).apply()
     }
@@ -283,7 +297,10 @@ object Prefs {
                         texto = o.optString("texto", ""),
                         recibida = o.optLong("r", 0L),
                         estado = o.optString("e", ""),
-                        extra = o.optString("x", "")
+                        extra = o.optString("x", ""),
+                        clave = o.optString("k", ""),
+                        duroMs = o.optLong("d", -1L),
+                        fin = o.optString("f", "")
                     )
                 )
             }
@@ -291,6 +308,74 @@ object Prefs {
             return emptyList()
         }
         return lista
+    }
+
+    private fun aJson(oferta: Oferta): JSONObject {
+        val o = JSONObject()
+        o.put("t", oferta.momento)
+        o.put("titulo", oferta.titulo)
+        o.put("texto", oferta.texto)
+        o.put("r", oferta.recibida)
+        o.put("e", oferta.estado)
+        o.put("x", oferta.extra)
+        o.put("k", oferta.clave)
+        o.put("d", oferta.duroMs)
+        o.put("f", oferta.fin)
+        return o
+    }
+
+    /**
+     * Anota cuanto duro una oferta y por que desaparecio de la bandeja.
+     * Solo toca la anotacion mas reciente que tenga esa clave y siga abierta.
+     */
+    fun cerrarOferta(ctx: Context, clave: String, duroMs: Long, fin: String) {
+        if (clave.isBlank()) return
+        val ofertas = registro(ctx)
+        var yaCerrada = false
+        val nuevo = JSONArray()
+        for (oferta in ofertas) {
+            val toca = !yaCerrada && oferta.clave == clave && oferta.duroMs < 0
+            if (toca) {
+                yaCerrada = true
+                nuevo.put(aJson(oferta.copy(duroMs = duroMs, fin = fin)))
+            } else {
+                nuevo.put(aJson(oferta))
+            }
+        }
+        if (!yaCerrada) return
+        sp(ctx).edit().putString(KEY_LOG, nuevo.toString()).apply()
+    }
+
+    // --------------------------------------------------------------- contador
+
+    /**
+     * Cuenta la oferta que acaba de llegar y devuelve dos datos baratos de
+     * calcular: cuantas van hoy, y cuantos milisegundos pasaron desde la
+     * anterior (-1 si es la primera).
+     *
+     * Se guarda aparte del registro a proposito: esto corre antes de que suene
+     * la alarma, asi que tiene que ser liviano.
+     */
+    fun contarOferta(ctx: Context, momento: Long, hoy: String): Pair<Int, Long> {
+        val prefs = sp(ctx)
+        val fechaGuardada = prefs.getString(KEY_CONTADOR_FECHA, "") ?: ""
+        val llevaba = if (fechaGuardada == hoy) prefs.getInt(KEY_CONTADOR, 0) else 0
+        val anterior = prefs.getLong(KEY_ULTIMA_OFERTA, 0L)
+        val desde = if (anterior <= 0L || momento < anterior) -1L else momento - anterior
+
+        prefs.edit()
+            .putString(KEY_CONTADOR_FECHA, hoy)
+            .putInt(KEY_CONTADOR, llevaba + 1)
+            .putLong(KEY_ULTIMA_OFERTA, momento)
+            .apply()
+
+        return Pair(llevaba + 1, desde)
+    }
+
+    fun ofertasDeHoy(ctx: Context, hoy: String): Int {
+        val prefs = sp(ctx)
+        val fechaGuardada = prefs.getString(KEY_CONTADOR_FECHA, "") ?: ""
+        return if (fechaGuardada == hoy) prefs.getInt(KEY_CONTADOR, 0) else 0
     }
 
     fun borrarRegistro(ctx: Context) {

@@ -4,6 +4,7 @@ import android.app.Notification
 import android.content.ComponentName
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
+import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.StatusBarNotification
 
 /**
@@ -24,9 +25,22 @@ class RutaListenerService : NotificationListenerService() {
      */
     private val atendidas = LinkedHashSet<String>()
 
+    /** Ofertas que estan en la bandeja ahora: clave -> cuando aparecieron. */
+    private val vivas = HashMap<String, Long>()
+
+    /**
+     * Clave de la oferta que tiene la alarma sonando ahora mismo.
+     *
+     * Sirve para callarla en cuanto esa oferta desaparece de la bandeja: si
+     * Mercado Libre la retiro, ya no hay nada que correr a tomar.
+     */
+    private var sonandoPor: String? = null
+
     override fun onListenerConnected() {
         super.onListenerConnected()
         atendidas.clear()
+        vivas.clear()
+        sonandoPor = null
     }
 
     override fun onListenerDisconnected() {
@@ -87,20 +101,93 @@ class RutaListenerService : NotificationListenerService() {
         val ahora = System.currentTimeMillis()
 
         if (activa && esOferta) {
+            // contar es barato (dos valores guardados), asi que se puede hacer
+            // antes de sonar y mostrarlo en la alerta
+            val (numero, desdeAnterior) = Prefs.contarOferta(ctx, ahora, Respaldo.hoy())
+
+            // guardar cuando empezo esta oferta, para medir despues cuanto duro
+            vivas[notificacion.key] = ahora
+
             // el aviso con el boton de abrir aparece siempre; la alarma, solo en horario
-            Aviso.mostrar(ctx, titulo, texto, recibida, extra)
+            Aviso.mostrar(ctx, titulo, texto, recibida, extra, numero, desdeAnterior)
             if (enHorario) {
                 Alarma.sonar(ctx, Prefs.duracionAlarma(ctx))
+                sonandoPor = notificacion.key
+
+                if (Prefs.vozActiva(ctx)) {
+                    val horario = Filtro.horarioDelTexto(titulo, texto, extra)
+                    Voz.decir(ctx, Voz.frase(numero, horario))
+                }
             }
         }
 
         // el registro se guarda siempre, incluso cuando no corresponde sonar:
         // asi se puede revisar despues que avisos quedaron filtrados
-        anotarEnSegundoPlano(ctx, titulo, texto, recibida, estado, extra, ahora)
+        anotarEnSegundoPlano(
+            ctx, titulo, texto, recibida, estado, extra, ahora, notificacion.key
+        )
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        // no se usa
+    /**
+     * Cuando la notificacion de la oferta desaparece de la bandeja.
+     *
+     * Aqui esta el dato que de verdad interesa: cuanto tiempo estuvo viva la
+     * oferta. Si la retiro Mercado Libre, es senal de que alguien la tomo o
+     * vencio, y esa es la ventana real que hay para reaccionar. Si la quitaste
+     * tu al abrirla o descartarla, no dice nada del tiempo disponible, por eso
+     * se anota el motivo junto con la duracion.
+     */
+    override fun onNotificationRemoved(
+        sbn: StatusBarNotification?,
+        rankingMap: RankingMap?,
+        reason: Int
+    ) {
+        val notificacion = sbn ?: return
+        if (notificacion.packageName != Prefs.PAQUETE_ENVIOS_EXTRA) return
+
+        val clave = notificacion.key
+
+        // Si la alarma estaba sonando por esta oferta, callarla: la oferta ya
+        // no esta en la bandeja, asi que no hay nada que ir a tomar. Esto
+        // tambien cubre el caso de que la persona descarte la notificacion.
+        if (sonandoPor == clave) {
+            sonandoPor = null
+            Voz.callar()
+            Alarma.detener()
+            Aviso.quitar(applicationContext)
+        }
+
+        val inicio = vivas.remove(clave) ?: return
+        val duro = System.currentTimeMillis() - inicio
+        if (duro < 0) return
+
+        val motivo = motivoDelFin(reason)
+        val ctx = applicationContext
+        try {
+            escribano.execute {
+                try {
+                    Prefs.cerrarOferta(ctx, clave, duro, motivo)
+                } catch (e: Exception) {
+                    // el dato de duracion es util, no critico
+                }
+            }
+        } catch (e: Exception) {
+            // nada
+        }
+    }
+
+    private fun motivoDelFin(reason: Int): String = when (reason) {
+        REASON_APP_CANCEL, REASON_APP_CANCEL_ALL ->
+            "la retiro Mercado Libre"
+        REASON_TIMEOUT ->
+            "vencio"
+        REASON_CLICK ->
+            "la abriste"
+        REASON_CANCEL, REASON_CANCEL_ALL, REASON_LISTENER_CANCEL,
+        REASON_LISTENER_CANCEL_ALL ->
+            "la descartaste"
+        else ->
+            "otro motivo"
     }
 
     /**
@@ -116,19 +203,22 @@ class RutaListenerService : NotificationListenerService() {
         recibida: Long,
         estado: String,
         extra: String,
-        momento: Long
+        momento: Long,
+        clave: String
     ) {
         try {
             escribano.execute {
                 try {
-                    Prefs.registrar(ctx, titulo, texto, recibida, estado, extra, momento)
+                    Prefs.registrar(
+                        ctx, titulo, texto, recibida, estado, extra, momento, clave
+                    )
                 } catch (e: Exception) {
                     // si falla la anotacion, la alerta ya se dio igual
                 }
             }
         } catch (e: Exception) {
             // si no se puede encolar, anotar aqui mismo antes que perder el dato
-            Prefs.registrar(ctx, titulo, texto, recibida, estado, extra, momento)
+            Prefs.registrar(ctx, titulo, texto, recibida, estado, extra, momento, clave)
         }
     }
 

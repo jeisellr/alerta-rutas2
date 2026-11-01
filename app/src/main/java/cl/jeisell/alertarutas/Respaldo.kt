@@ -33,13 +33,17 @@ object Respaldo {
      * Excel en Chile.
      */
     fun armarCsv(ofertas: List<Oferta>): String {
-        val sb = StringBuilder("Fecha;Hora;Reaccion ms;Alarma;Titulo;Texto;Texto adicional\r\n")
+        val sb = StringBuilder(
+            "Fecha;Hora;Reaccion ms;Alarma;Duro ms;Como termino;Titulo;Texto;Texto adicional\r\n"
+        )
         for (o in ofertas) {
             val momento = Date(o.momento)
             sb.append(campo(FECHA_FILA.format(momento))).append(';')
             sb.append(campo(HORA_FILA.format(momento))).append(';')
             sb.append(campo(if (o.demoraMs < 0) "" else o.demoraMs.toString())).append(';')
             sb.append(campo(descripcionEstado(o.estado))).append(';')
+            sb.append(campo(if (o.duroMs < 0) "" else o.duroMs.toString())).append(';')
+            sb.append(campo(o.fin)).append(';')
             sb.append(campo(o.titulo)).append(';')
             sb.append(campo(o.texto)).append(';')
             sb.append(campo(o.extra)).append("\r\n")

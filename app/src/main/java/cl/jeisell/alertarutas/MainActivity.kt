@@ -34,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var swHorario: Switch
     private lateinit var swSinLimite: Switch
     private lateinit var swSoloOfertas: Switch
+    private lateinit var swVoz: Switch
     private lateinit var etPalabrasOferta: EditText
     private lateinit var etPalabrasIgnorar: EditText
     private lateinit var sbSegundos: SeekBar
@@ -63,6 +64,7 @@ class MainActivity : Activity() {
         swHorario = findViewById(R.id.swHorario)
         swSinLimite = findViewById(R.id.swSinLimite)
         swSoloOfertas = findViewById(R.id.swSoloOfertas)
+        swVoz = findViewById(R.id.swVoz)
         etPalabrasOferta = findViewById(R.id.etPalabrasOferta)
         etPalabrasIgnorar = findViewById(R.id.etPalabrasIgnorar)
         sbSegundos = findViewById(R.id.sbSegundos)
@@ -128,6 +130,17 @@ class MainActivity : Activity() {
             }
         }
 
+        swVoz.isChecked = Prefs.vozActiva(this)
+        swVoz.setOnCheckedChangeListener { _, marcado ->
+            Prefs.setVozActiva(this, marcado)
+            if (marcado) {
+                // prueba inmediata, para saber como suena
+                Voz.decir(this, Voz.frase(Prefs.ofertasDeHoy(this, Respaldo.hoy()) + 1, null))
+            } else {
+                Voz.callar()
+            }
+        }
+
         swSinLimite.isChecked = Prefs.sinLimite(this)
         swSinLimite.setOnCheckedChangeListener { _, marcado ->
             Prefs.setSinLimite(this, marcado)
@@ -150,6 +163,7 @@ class MainActivity : Activity() {
             Alarma.sonar(this, Prefs.duracionAlarma(this))
         }
         findViewById<Button>(R.id.btnDetener).setOnClickListener {
+            Voz.callar()
             Alarma.detener()
             Aviso.quitar(this)
         }
@@ -238,7 +252,7 @@ class MainActivity : Activity() {
         val sinLimite = Prefs.sinLimite(this)
         sbSegundos.isEnabled = !sinLimite
         tvSegundos.text = if (sinLimite) {
-            "Duracion de la alarma: hasta que la apagues"
+            "Duracion de la alarma: mientras la oferta siga disponible"
         } else {
             "Duracion de la alarma: ${Prefs.segundosAlarma(this)} segundos"
         }
@@ -300,6 +314,11 @@ class MainActivity : Activity() {
                 sb.append("  ")
                 sb.append(motivo)
             }
+            val duracion = etiquetaDuracion(o)
+            if (duracion.isNotEmpty()) {
+                sb.append("  ")
+                sb.append(duracion)
+            }
             sb.append("\n")
             if (o.titulo.isNotBlank()) {
                 sb.append(o.titulo)
@@ -324,6 +343,13 @@ class MainActivity : Activity() {
         } else {
             "(reaccion: ${String.format(Locale.US, "%.1f", ms / 1000.0)} s)"
         }
+    }
+
+    /** Cuanto estuvo viva la oferta y por que desaparecio. */
+    private fun etiquetaDuracion(o: Oferta): String {
+        if (o.duroMs < 0) return ""
+        val tiempo = Aviso.enPalabras(o.duroMs)
+        return if (o.fin.isBlank()) "duro $tiempo" else "duro $tiempo (${o.fin})"
     }
 
     private fun etiquetaEstado(o: Oferta): String = when (o.estado) {

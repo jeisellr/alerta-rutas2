@@ -98,6 +98,21 @@
         </LinearLayout>
 
         <Switch
+            android:id="@+id/swVoz"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/voz"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/voz_ayuda"
+            android:textSize="12sp" />
+
+        <Switch
             android:id="@+id/swSinLimite"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -26,6 +26,7 @@ class AlertaActivity : Activity() {
     private lateinit var tvTexto: TextView
     private lateinit var tvMomento: TextView
     private lateinit var tvHorario: TextView
+    private lateinit var tvResumen: TextView
 
     private val formatoMomento = SimpleDateFormat("EEEE d 'de' MMMM · HH:mm", Locale("es", "CL"))
 
@@ -43,6 +44,7 @@ class AlertaActivity : Activity() {
         tvTexto = findViewById(R.id.tvAlertaTexto)
         tvMomento = findViewById(R.id.tvAlertaMomento)
         tvHorario = findViewById(R.id.tvAlertaHorario)
+        tvResumen = findViewById(R.id.tvAlertaResumen)
 
         findViewById<Button>(R.id.btnAlertaAbrir).setOnClickListener { abrirConDesbloqueo() }
         findViewById<Button>(R.id.btnAlertaSilenciar).setOnClickListener { silenciar() }
@@ -74,6 +76,17 @@ class AlertaActivity : Activity() {
         val cuando = if (momento > 0L) Date(momento) else Date()
         tvMomento.text = conMayuscula(formatoMomento.format(cuando))
 
+        // cuantas ofertas van hoy y hace cuanto fue la anterior
+        val numero = intent?.getIntExtra(Aviso.EXTRA_NUMERO, 0) ?: 0
+        val desde = intent?.getLongExtra(Aviso.EXTRA_DESDE, -1L) ?: -1L
+        val resumen = Aviso.resumenDelDia(numero, desde)
+        if (resumen.isEmpty()) {
+            tvResumen.visibility = View.GONE
+        } else {
+            tvResumen.visibility = View.VISIBLE
+            tvResumen.text = resumen
+        }
+
         // horario del recorrido, solo si Envios Extra lo escribio en el texto
         val horario = Filtro.horarioDelTexto(titulo, texto, detalle)
         if (horario == null) {
@@ -93,6 +106,7 @@ class AlertaActivity : Activity() {
      * desbloquear. Pedimos el desbloqueo y recien ahi abrimos Envios Extra.
      */
     private fun abrirConDesbloqueo() {
+        Voz.callar()
         Alarma.detener()
         Aviso.quitar(applicationContext)
 
@@ -130,6 +144,7 @@ class AlertaActivity : Activity() {
     }
 
     private fun silenciar() {
+        Voz.callar()
         Alarma.detener()
         Aviso.quitar(applicationContext)
         finish()

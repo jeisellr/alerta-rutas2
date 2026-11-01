@@ -8,6 +8,7 @@ import android.content.Intent
 class SilenciarReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context?, intent: Intent?) {
+        Voz.callar()
         Alarma.detener()
         val ctx = context ?: return
         Aviso.quitar(ctx.applicationContext)

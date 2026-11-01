@@ -70,6 +70,21 @@ object Alarma {
 
     fun sonando(): Boolean = player != null
 
+    /**
+     * Baja o devuelve el volumen de la alarma.
+     * Se usa mientras la voz habla, para que se entienda lo que dice.
+     */
+    @Synchronized
+    fun atenuar(bajar: Boolean) {
+        val mp = player ?: return
+        val nivel = if (bajar) 0.15f else 1.0f
+        try {
+            mp.setVolume(nivel, nivel)
+        } catch (e: Exception) {
+            // nada: el volumen no es critico
+        }
+    }
+
     /** Cuanto va a sonar, en milisegundos, para una duracion pedida en segundos. */
     fun duracionMs(segundos: Int): Long =
         if (segundos <= 0) TOPE_SIN_LIMITE_MS else segundos.coerceIn(3, 120) * 1000L

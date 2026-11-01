@@ -23,15 +23,43 @@ object Aviso {
     const val EXTRA_TEXTO = "texto"
     const val EXTRA_MOMENTO = "momento"
     const val EXTRA_DETALLE = "detalle"
+    const val EXTRA_NUMERO = "numero"
+    const val EXTRA_DESDE = "desde"
 
-    private const val CANAL = "ofertas_ruta"
+    /** "Oferta N°3 de hoy · la anterior hace 23 min", o vacio si no hay datos. */
+    fun resumenDelDia(numero: Int, desdeAnterior: Long): String {
+        if (numero <= 0) return ""
+        val partes = ArrayList<String>()
+        partes.add("Oferta N°$numero de hoy")
+        if (desdeAnterior > 0) {
+            partes.add("la anterior hace ${enPalabras(desdeAnterior)}")
+        }
+        return partes.joinToString(" · ")
+    }
+
+    /** Convierte milisegundos a algo legible: "45 s", "23 min", "2 h 10 min". */
+    fun enPalabras(ms: Long): String {
+        if (ms < 0) return ""
+        val segundos = ms / 1000
+        if (segundos < 60) return "$segundos s"
+        val minutos = segundos / 60
+        if (minutos < 60) return "$minutos min"
+        val horas = minutos / 60
+        val resto = minutos % 60
+        return if (resto == 0L) "$horas h" else "$horas h $resto min"
+    }
+
+    private const val CANAL = "ofertas_ruta_2"
+    private const val CANAL_VIEJO = "ofertas_ruta"
 
     fun mostrar(
         ctx: Context,
         titulo: String,
         texto: String,
         recibida: Long = 0L,
-        extra: String = ""
+        extra: String = "",
+        numero: Int = 0,
+        desdeAnterior: Long = -1L
     ) {
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
@@ -54,6 +82,8 @@ object Aviso {
         pantallaCompleta.putExtra(EXTRA_TEXTO, texto)
         pantallaCompleta.putExtra(EXTRA_MOMENTO, recibida)
         pantallaCompleta.putExtra(EXTRA_DETALLE, extra)
+        pantallaCompleta.putExtra(EXTRA_NUMERO, numero)
+        pantallaCompleta.putExtra(EXTRA_DESDE, desdeAnterior)
         val piPantallaCompleta = PendingIntent.getActivity(
             ctx, 3, pantallaCompleta, banderas()
         )
@@ -66,7 +96,9 @@ object Aviso {
             extra.isNotBlank() -> extra
             else -> "Toca para abrir Envios Extra"
         }
-        val cuerpo = if (horario != null) "Recorrido: $horario\n$base" else base
+        val resumen = resumenDelDia(numero, desdeAnterior)
+        val conHorario = if (horario != null) "Recorrido: $horario\n$base" else base
+        val cuerpo = if (resumen.isEmpty()) conHorario else "$resumen\n$conHorario"
 
         val constructor = Notification.Builder(ctx, CANAL)
             .setSmallIcon(R.drawable.ic_app)
@@ -77,6 +109,8 @@ object Aviso {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
+            // false = el aviso tambien viaja al reloj emparejado
+            .setLocalOnly(false)
             .setContentIntent(piAbrir)
             .setFullScreenIntent(piPantallaCompleta, true)
             .addAction(
@@ -123,11 +157,22 @@ object Aviso {
             NotificationManager.IMPORTANCE_HIGH
         )
         canal.description = "Aviso en pantalla cuando llega una oferta de ruta"
-        // el sonido y la vibracion los maneja Alarma.kt, para no sonar dos veces
+        // el sonido lo maneja Alarma.kt, para no sonar dos veces
         canal.setSound(null, null)
-        canal.enableVibration(false)
+        // la vibracion del canal es la que hace vibrar el reloj emparejado;
+        // en el telefono se suma a la de Alarma.kt y casi no se nota
+        canal.enableVibration(true)
+        canal.vibrationPattern = longArrayOf(0, 600, 300, 600)
         canal.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(canal)
+
+        // el canal anterior no vibraba y por eso el reloj quedaba mudo:
+        // los canales no se pueden modificar, hay que reemplazarlos
+        try {
+            nm.deleteNotificationChannel(CANAL_VIEJO)
+        } catch (e: Exception) {
+            // nada
+        }
     }
 
     private fun intentAbrirEnviosExtra(ctx: Context): Intent {

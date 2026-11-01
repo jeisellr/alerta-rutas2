@@ -14,6 +14,11 @@ llegaron.
   son ofertas (que llegaste al domicilio, los del desafío, el de la ubicación en
   segundo plano, las ganancias acreditadas). Esos quedan anotados en el registro
   pero no hacen sonar la alarma. Las frases del filtro se editan desde la app.
+- **Cuenta las ofertas del día y mide cuánto duran.** La alerta dice "Oferta
+  N°3 de hoy · la anterior hace 23 min". Y cuando la notificación desaparece de
+  la bandeja, anota cuánto estuvo viva y por qué se fue: si la retiró Mercado
+  Libre (alguien la tomó o venció), si venció, o si la quitaste tú. Ese es el
+  dato real de cuántos segundos hay para reaccionar.
 - **Muestra el día y la hora**: el aviso a pantalla completa dice en grande
   cuándo llegó la oferta, y si Envíos Extra incluye el día u horario del
   recorrido en el texto, lo rescata y lo muestra destacado. Reconoce "mañana",
@@ -33,8 +38,18 @@ llegaron.
   zonas salen más rutas. El registro se puede compartir o exportar como texto.
 - **Respaldo en Descargas**: guarda el historial como archivo `.csv` abrible en
   Excel o Google Sheets, con un botón y también solo, una vez al día.
+- **Dice la oferta en voz alta** (opcional): anuncia que llegó una oferta,
+  cuántas van hoy y el horario si viene en el texto. Mientras habla baja el
+  volumen de la alarma para que se entienda, y lo devuelve al terminar.
+- **Llega a la pulsera o reloj emparejado.** El canal del aviso vibra, así que
+  el aviso se replica en un Galaxy Fit o similar, siempre que la app esté
+  habilitada en Galaxy Wearable → Notificaciones.
+- **La alarma dura lo que dura la oferta.** En vez de un tiempo fijo
+  arbitrario, puede sonar mientras la notificación siga en la bandeja y callarse
+  sola en cuanto Mercado Libre la retira — justo cuando ya no sirve correr.
+  Con tope de 5 minutos por seguridad.
 - Switch para activar/desactivar, control de duración de la alarma (5 a 60 s) o
-  **hasta que la apagues**, y botón de prueba.
+  ligada a la vida de la oferta, y botón de prueba.
 
 **Lo que NO hace, a propósito**
 
